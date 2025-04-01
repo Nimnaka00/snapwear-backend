@@ -12,7 +12,10 @@ app.use(express.json());
 
 // Routes
 const authRoutes = require('./routes/authRoutes');
-app.use('/api/auth', authRoutes); // ✅ Auth API route
+const userRoutes = require('./routes/userRoutes'); // 👈 NEW route added here
+
+app.use('/api/auth', authRoutes);      // ✅ Auth routes (register, login, reset)
+app.use('/api/user', userRoutes);      // ✅ User profile route (JWT protected)
 
 // DB Connect
 mongoose.connect(process.env.MONGO_URI, {
