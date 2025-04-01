@@ -22,10 +22,34 @@ exports.getProductById = async (req, res) => {
   }
 };
 
-// ➕ Add New Product
+// ➕ Add New Product (with image upload)
 exports.addProduct = async (req, res) => {
   try {
-    const newProduct = new Product(req.body);
+    const {
+      name,
+      brand,
+      category,
+      price,
+      size,
+      color,
+      stockCount,
+      description
+    } = req.body;
+
+    const imageUrl = req.file?.path || '';
+
+    const newProduct = new Product({
+      name,
+      brand,
+      category,
+      price,
+      size: size?.split(',') || [],
+      color,
+      stockCount,
+      description,
+      imageUrl
+    });
+
     await newProduct.save();
     res.status(201).json({ message: "Product created", product: newProduct });
   } catch (err) {
