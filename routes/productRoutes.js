@@ -8,14 +8,15 @@ const {
   deleteProduct
 } = require('../controllers/productController');
 
-const auth = require('../middlewares/authMiddleware'); // 👈 use this to protect add/edit/delete if needed
+const auth = require('../middlewares/authMiddleware');
+const upload = require('../middlewares/multer'); // 👈 NEW: Multer + Cloudinary setup
 
 // Public routes
 router.get('/', getAllProducts);
 router.get('/:id', getProductById);
 
-// Protected admin routes (you can secure with `auth`)
-router.post('/', auth, addProduct);
+// Protected routes with image upload
+router.post('/', auth, upload.single('image'), addProduct);  // 👈 Handles image upload
 router.put('/:id', auth, updateProduct);
 router.delete('/:id', auth, deleteProduct);
 
