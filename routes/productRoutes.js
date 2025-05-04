@@ -1,5 +1,9 @@
+// productRoutes.js
 const express = require('express');
 const router = express.Router();
+const auth = require('../middlewares/authMiddleware');
+const upload = require('../middlewares/multer');
+
 const {
   getAllProducts,
   getProductById,
@@ -8,15 +12,9 @@ const {
   deleteProduct
 } = require('../controllers/productController');
 
-const auth = require('../middlewares/authMiddleware');
-const upload = require('../middlewares/multer'); // 👈 NEW: Multer + Cloudinary setup
-
-// Public routes
 router.get('/', getAllProducts);
 router.get('/:id', getProductById);
-
-// Protected routes with image upload
-router.post('/', auth, upload.single('image'), addProduct);  // 👈 Handles image upload
+router.post('/', auth, upload.single('image'), addProduct);
 router.put('/:id', auth, upload.single('image'), updateProduct);
 router.delete('/:id', auth, deleteProduct);
 
