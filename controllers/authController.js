@@ -15,7 +15,19 @@ exports.registerUser = async (req, res) => {
     const newUser = new User({ firstName, lastName, email, password: hashedPassword });
 
     await newUser.save();
-    res.status(201).json({ message: 'Account created successfully' });
+
+    const token = jwt.sign({ userId: newUser._id }, process.env.JWT_SECRET, { expiresIn: '7d' });
+
+    res.status(201).json({
+      message: 'Account created successfully',
+      token,
+      user: {
+        id: newUser._id,
+        firstName: newUser.firstName,
+        lastName: newUser.lastName,
+        email: newUser.email
+      }
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -33,7 +45,15 @@ exports.loginUser = async (req, res) => {
 
     const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: '7d' });
 
-    res.json({ token, user: { id: user._id, name: user.firstName, email: user.email } });
+    res.json({
+      token,
+      user: {
+        id: user._id,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email
+      }
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
