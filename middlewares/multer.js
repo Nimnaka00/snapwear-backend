@@ -5,12 +5,10 @@ const cloudinary = require('../config/cloudinary');
 const storage = new CloudinaryStorage({
   cloudinary,
   params: {
-    folder: 'snapwear/products', // Cloudinary folder
+    folder: 'snapwear/products',
     allowed_formats: ['jpg', 'png', 'jpeg'],
-    transformation: [{ width: 800, height: 800, crop: "limit" }]
-  }
+    transformation: [{ width: 800, height: 800, crop: 'limit' }],
+  },
 });
 
-const upload = multer({ storage });
-
-module.exports = upload;
+module.exports = multer({ storage });
