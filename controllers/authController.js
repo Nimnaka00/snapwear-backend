@@ -4,7 +4,10 @@ const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const nodemailer = require('nodemailer');
 
-// REGISTER
+// Helper: Generate 6-digit OTP
+const generateOTP = () => Math.floor(100000 + Math.random() * 900000).toString();
+
+// ✅ REGISTER
 exports.registerUser = async (req, res) => {
   const { firstName, lastName, email, password } = req.body;
   try {
@@ -33,7 +36,7 @@ exports.registerUser = async (req, res) => {
   }
 };
 
-// LOGIN
+// ✅ LOGIN
 exports.loginUser = async (req, res) => {
   const { email, password } = req.body;
   try {
@@ -59,19 +62,17 @@ exports.loginUser = async (req, res) => {
   }
 };
 
-// FORGOT PASSWORD
-exports.forgotPassword = async (req, res) => {
+// ✅ SEND OTP TO EMAIL
+exports.sendOtp = async (req, res) => {
   const { email } = req.body;
   try {
     const user = await User.findOne({ email });
     if (!user) return res.status(404).json({ message: 'User not found' });
 
-    const token = crypto.randomBytes(32).toString('hex');
-    user.resetPasswordToken = token;
-    user.resetPasswordExpires = Date.now() + 3600000; // 1 hour
+    const otp = generateOTP();
+    user.resetPasswordToken = otp;
+    user.resetPasswordExpires = Date.now() + 5 * 60 * 1000; // 5 minutes
     await user.save();
-
-    const resetURL = `http://localhost:3000/reset-password/${token}`;
 
     const transporter = nodemailer.createTransport({
       service: 'gmail',
@@ -84,28 +85,43 @@ exports.forgotPassword = async (req, res) => {
     const mailOptions = {
       from: 'SnapWear <no-reply@snapwear.com>',
       to: email,
-      subject: 'Reset Your Password',
-      html: `<p>Click the link below to reset your password:</p><a href="${resetURL}">${resetURL}</a>`
+      subject: 'Your SnapWear OTP Code',
+      html: `<p>Your OTP for password reset is:</p>
+             <h2>${otp}</h2>
+             <p>This code will expire in 5 minutes.</p>`
     };
 
     await transporter.sendMail(mailOptions);
-    res.json({ message: 'Reset link sent to email.' });
+    res.json({ message: 'OTP sent to your email' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 };
 
-// RESET PASSWORD
-exports.resetPassword = async (req, res) => {
-  const { token } = req.params;
-  const { newPassword } = req.body;
+// ✅ VERIFY OTP
+exports.verifyOtp = async (req, res) => {
+  const { email, otp } = req.body;
   try {
     const user = await User.findOne({
-      resetPasswordToken: token,
+      email,
+      resetPasswordToken: otp,
       resetPasswordExpires: { $gt: Date.now() }
     });
 
-    if (!user) return res.status(400).json({ message: 'Invalid or expired token' });
+    if (!user) return res.status(400).json({ message: 'Invalid or expired OTP' });
+
+    res.json({ message: 'OTP verified successfully' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// ✅ RESET PASSWORD
+exports.resetPassword = async (req, res) => {
+  const { email, newPassword } = req.body;
+  try {
+    const user = await User.findOne({ email });
+    if (!user) return res.status(404).json({ message: 'User not found' });
 
     user.password = await bcrypt.hash(newPassword, 10);
     user.resetPasswordToken = undefined;
