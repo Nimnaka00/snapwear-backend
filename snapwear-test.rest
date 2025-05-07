@@ -1,0 +1,40 @@
+### ✅ Register a user
+POST http://localhost:5000/api/auth/register
+Content-Type: application/json
+
+{
+  "firstName": "Nimnaka",
+  "lastName": "Fernando",
+  "email": "nim@example.com",
+  "password": "nim12345"
+}
+
+###
+
+### ✅ Login
+POST http://localhost:5000/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "nim@example.com",
+  "password": "nim12345"
+}
+
+###
+
+### ✅ Get all products
+GET http://localhost:5000/api/products
+
+###
+
+### ✅ Add new product (Protected)
+POST http://localhost:5000/api/products
+Content-Type: application/json
+Authorization: Bearer YOUR_JWT_TOKEN_HERE
+
+{
+  "name": "Cool Jacket",
+  "price": 5999,
+  "category": "Men",
+  "imageUrl": "https://your-cloudinary-image-url.jpg"
+}
