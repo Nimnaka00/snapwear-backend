@@ -1,4 +1,4 @@
-const Product = require('../models/Product');
+const Product = require("../models/Product");
 
 // 🔄 Get All Products (Public)
 exports.getAllProducts = async (req, res) => {
@@ -33,21 +33,21 @@ exports.addProduct = async (req, res) => {
       size,
       color,
       stockCount,
-      description
+      description,
     } = req.body;
 
-    const imageUrl = req.file?.path || '';
+    const imageUrl = req.file?.path || "";
 
     const newProduct = new Product({
       name,
       brand,
       category,
       price,
-      size: size?.split(',') || [],
+      size: size?.split(",") || [],
       color,
       stockCount,
       description,
-      imageUrl
+      imageUrl,
     });
 
     await newProduct.save();
@@ -68,20 +68,21 @@ exports.updateProduct = async (req, res) => {
       size,
       color,
       stockCount,
-      description
+      description,
     } = req.body;
 
     const newImage = req.file?.path;
 
     const updatedProduct = await Product.findById(req.params.id);
-    if (!updatedProduct) return res.status(404).json({ message: "Product not found" });
+    if (!updatedProduct)
+      return res.status(404).json({ message: "Product not found" });
 
     // Update fields
     updatedProduct.name = name || updatedProduct.name;
     updatedProduct.brand = brand || updatedProduct.brand;
     updatedProduct.category = category || updatedProduct.category;
     updatedProduct.price = price || updatedProduct.price;
-    updatedProduct.size = size?.split(',') || updatedProduct.size;
+    updatedProduct.size = size?.split(",") || updatedProduct.size;
     updatedProduct.color = color || updatedProduct.color;
     updatedProduct.stockCount = stockCount || updatedProduct.stockCount;
     updatedProduct.description = description || updatedProduct.description;
@@ -92,6 +93,26 @@ exports.updateProduct = async (req, res) => {
 
     await updatedProduct.save();
     res.json({ message: "Product updated", product: updatedProduct });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// Add this method
+exports.searchProducts = async (req, res) => {
+  const keyword = req.query.keyword;
+  try {
+    const regex = new RegExp(keyword, "i");
+    const products = await Product.find({
+      $or: [
+        { name: regex },
+        { brand: regex },
+        { category: regex },
+        { description: regex },
+        { color: regex },
+      ],
+    });
+    res.json(products);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
