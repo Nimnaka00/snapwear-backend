@@ -1,57 +1,88 @@
 // server.js
-require('dotenv').config();
-const express = require('express');
-const cors = require('cors');
-const connectDB = require('./config/db');
+require("dotenv").config();
+const express = require("express");
+const cors = require("cors");
+const helmet = require("helmet");
+const rateLimit = require("express-rate-limit");
+const connectDB = require("./config/db");
 
-// Auth / Products
-const authRoutes    = require('./routes/authRoutes');
-const productRoutes = require('./routes/productRoutes');
-
-// User (profile, personal data, notifications, payment methods)
-const userRoutes    = require('./routes/userRoutes');
-
-// Cart / Orders / Payment webhook
-const cartRoutes    = require('./routes/cartRoutes');
-const orderRoutes   = require('./routes/orderRoutes');
-const paymentRoutes = require('./routes/paymentRoutes');
+// Routes
+const authRoutes = require("./routes/authRoutes");
+const productRoutes = require("./routes/productRoutes");
+const userRoutes = require("./routes/userRoutes");
+const cartRoutes = require("./routes/cartRoutes");
+const orderRoutes = require("./routes/orderRoutes");
+const paymentRoutes = require("./routes/paymentRoutes");
 
 const app = express();
 
-// ─── MIDDLEWARE ──────────────────────────────────────
+/* ─────────────────── SECURITY ─────────────────── */
+app.use(helmet());
+app.disable("x-powered-by");
 
-// Enable CORS for all routes
-app.use(cors());
+// CORS: allow your dev Vite origin(s) and anything in env
+const ALLOWED_ORIGINS = [
+  "http://localhost:5173",
+  "http://127.0.0.1:5173",
+  process.env.FRONTEND_ORIGIN, // e.g. https://snapwear.example.com
+].filter(Boolean);
 
-// Use raw body for Stripe webhooks; JSON body parser everywhere else
+app.use(
+  cors({
+    origin: (origin, cb) => {
+      if (!origin) return cb(null, true); // non-browser / curl
+      if (ALLOWED_ORIGINS.includes(origin)) return cb(null, true);
+      // loosen during local dev; tighten for prod
+      return cb(null, true);
+      // For strict prod, use: cb(new Error("Not allowed by CORS"));
+    },
+    credentials: true,
+  })
+);
+
+// Rate limit (v5 syntax uses `max`; v6+ uses `limit`)
+const apiLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000, // 10 minutes
+  max: 600, // if on v6+, change to `limit: 600`
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+app.use("/api/", apiLimiter);
+
+/* ──────────────── BODY PARSING ───────────────── */
 app.use((req, res, next) => {
-  if (req.originalUrl === '/api/payment/webhook') {
-    return next();
-  }
-  express.json()(req, res, next);
+  if (req.originalUrl === "/api/payment/webhook") return next(); // Stripe raw body
+  express.json({ limit: "1mb" })(req, res, next);
 });
 
-// Serve local uploads
-app.use('/uploads', express.static('uploads'));
+// Static for local uploads (if used)
+app.use("/uploads", express.static("uploads"));
 
-// ─── ROUTES ──────────────────────────────────────────
+/* ─────────────────── ROUTES ─────────────────── */
+app.get("/api/health", (_req, res) => {
+  res.json({ ok: true, env: process.env.NODE_ENV || "development" });
+});
 
-// Public & Auth
-app.use('/api/auth',     authRoutes);
-app.use('/api/products', productRoutes);
+app.use("/api/auth", authRoutes);
+app.use("/api/products", productRoutes);
+app.use("/api/users", userRoutes);
+app.use("/api/cart", cartRoutes);
+app.use("/api/orders", orderRoutes);
+app.use("/api/payment", paymentRoutes);
 
-// Protected: user profile & settings
-app.use('/api/users',    userRoutes);
+/* ─────────────── 404 + ERROR HANDLERS ─────────────── */
+app.use((req, res, _next) => {
+  res.status(404).json({ error: "Not Found", path: req.originalUrl });
+});
 
-// Cart and Checkout
-app.use('/api/cart',     cartRoutes);
-app.use('/api/orders',   orderRoutes);
+app.use((err, _req, res, _next) => {
+  console.error("Unhandled error:", err);
+  res
+    .status(err.status || 500)
+    .json({ error: err.message || "Internal Server Error" });
+});
 
-// Stripe webhook (no JSON parsing)
-app.use('/api/payment',  paymentRoutes);
-
-// ─── STARTUP ─────────────────────────────────────────
-
+/* ─────────────────── STARTUP ─────────────────── */
 if (require.main === module) {
   connectDB()
     .then(() => {
@@ -60,8 +91,8 @@ if (require.main === module) {
         console.log(`✅ Server running on port ${PORT}`);
       });
     })
-    .catch(err => {
-      console.error('❌ Failed to connect to database:', err);
+    .catch((err) => {
+      console.error("❌ Failed to connect to database:", err);
       process.exit(1);
     });
 }
