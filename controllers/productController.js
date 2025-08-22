@@ -1,28 +1,64 @@
 const Product = require("../models/Product");
 
-// 🔄 Get All Products (Public)
+// GET /api/products?keyword=&category=&minPrice=&maxPrice=&page=&limit=&sort=
 exports.getAllProducts = async (req, res) => {
   try {
-    const products = await Product.find();
-    res.json(products);
+    const {
+      keyword = "",
+      category,
+      minPrice,
+      maxPrice,
+      page = 1,
+      limit = 12,
+      sort = "-createdAt", // -price for high->low, price for low->high
+    } = req.query;
+
+    const q = {};
+    if (keyword) {
+      const regex = new RegExp(keyword, "i");
+      q.$or = [
+        { name: regex },
+        { brand: regex },
+        { description: regex },
+        { color: regex },
+      ];
+    }
+    if (category) q.category = category;
+    if (minPrice || maxPrice) {
+      q.price = {};
+      if (minPrice) q.price.$gte = Number(minPrice);
+      if (maxPrice) q.price.$lte = Number(maxPrice);
+    }
+
+    const skip = (Number(page) - 1) * Number(limit);
+    const [items, total] = await Promise.all([
+      Product.find(q).sort(sort).skip(skip).limit(Number(limit)),
+      Product.countDocuments(q),
+    ]);
+
+    res.json({
+      items,
+      page: Number(page),
+      pages: Math.ceil(total / Number(limit)),
+      total,
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 };
 
-// 🧾 Get Single Product by ID
+// Single
 exports.getProductById = async (req, res) => {
   try {
     const product = await Product.findById(req.params.id);
     if (!product) return res.status(404).json({ message: "Product not found" });
-
     res.json(product);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 };
 
-// ➕ Add New Product (with image upload)
+// Create (admin)
 exports.addProduct = async (req, res) => {
   try {
     const {
@@ -42,10 +78,14 @@ exports.addProduct = async (req, res) => {
       name,
       brand,
       category,
-      price,
-      size: size?.split(",") || [],
+      price: Number(price),
+      size:
+        size
+          ?.split(",")
+          .map((s) => s.trim())
+          .filter(Boolean) || [],
       color,
-      stockCount,
+      stockCount: Number(stockCount),
       description,
       imageUrl,
     });
@@ -57,7 +97,7 @@ exports.addProduct = async (req, res) => {
   }
 };
 
-// ✏️ Update Product (with image support)
+// Update (admin)
 exports.updateProduct = async (req, res) => {
   try {
     const {
@@ -71,25 +111,26 @@ exports.updateProduct = async (req, res) => {
       description,
     } = req.body;
 
-    const newImage = req.file?.path;
-
     const updatedProduct = await Product.findById(req.params.id);
     if (!updatedProduct)
       return res.status(404).json({ message: "Product not found" });
 
-    // Update fields
-    updatedProduct.name = name || updatedProduct.name;
-    updatedProduct.brand = brand || updatedProduct.brand;
-    updatedProduct.category = category || updatedProduct.category;
-    updatedProduct.price = price || updatedProduct.price;
-    updatedProduct.size = size?.split(",") || updatedProduct.size;
-    updatedProduct.color = color || updatedProduct.color;
-    updatedProduct.stockCount = stockCount || updatedProduct.stockCount;
-    updatedProduct.description = description || updatedProduct.description;
-
-    if (newImage) {
-      updatedProduct.imageUrl = newImage;
-    }
+    updatedProduct.name = name ?? updatedProduct.name;
+    updatedProduct.brand = brand ?? updatedProduct.brand;
+    updatedProduct.category = category ?? updatedProduct.category;
+    updatedProduct.price =
+      price !== undefined ? Number(price) : updatedProduct.price;
+    updatedProduct.size = size
+      ? size
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean)
+      : updatedProduct.size;
+    updatedProduct.color = color ?? updatedProduct.color;
+    updatedProduct.stockCount =
+      stockCount !== undefined ? Number(stockCount) : updatedProduct.stockCount;
+    updatedProduct.description = description ?? updatedProduct.description;
+    if (req.file?.path) updatedProduct.imageUrl = req.file.path;
 
     await updatedProduct.save();
     res.json({ message: "Product updated", product: updatedProduct });
@@ -98,9 +139,9 @@ exports.updateProduct = async (req, res) => {
   }
 };
 
-// Add this method
+// Simple search (kept for compatibility)
 exports.searchProducts = async (req, res) => {
-  const keyword = req.query.keyword;
+  const keyword = req.query.keyword || "";
   try {
     const regex = new RegExp(keyword, "i");
     const products = await Product.find({
@@ -111,19 +152,17 @@ exports.searchProducts = async (req, res) => {
         { description: regex },
         { color: regex },
       ],
-    });
+    }).limit(50);
     res.json(products);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 };
 
-// ❌ Delete Product
 exports.deleteProduct = async (req, res) => {
   try {
     const deleted = await Product.findByIdAndDelete(req.params.id);
     if (!deleted) return res.status(404).json({ message: "Product not found" });
-
     res.json({ message: "Product deleted" });
   } catch (err) {
     res.status(500).json({ error: err.message });
